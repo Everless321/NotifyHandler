@@ -2,9 +2,13 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>UIBackgroundModes</key>
+	<key>LSUIElement</key>
+	<true/>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>用于接收本地网络中的Webhook通知</string>
+	<key>NSBonjourServices</key>
 	<array>
-		<string>remote-notification</string>
+		<string>_http._tcp</string>
 	</array>
 </dict>
 </plist>
