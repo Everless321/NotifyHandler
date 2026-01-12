@@ -6,6 +6,7 @@ struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \NotificationRecord.timestamp, order: .reverse) private var records: [NotificationRecord]
     @ObservedObject var server: WebhookServer
+    var modelContainer: ModelContainer
     @State private var showSettings = false
     @AppStorage("serverPort") private var serverPort: Int = 19527
 
@@ -35,9 +36,6 @@ struct ContentView: View {
         }
         .sheet(isPresented: $showSettings) {
             SettingsView(server: server, port: $serverPort)
-        }
-        .onAppear {
-            setupServer()
         }
     }
 
@@ -81,20 +79,6 @@ struct ContentView: View {
                 ContentUnavailableView("暂无通知", systemImage: "bell.slash", description: Text("收到的Webhook通知将显示在这里"))
             }
         }
-    }
-
-    private func setupServer() {
-        NotificationManager.shared.requestPermission()
-        server.port = UInt16(serverPort)
-        server.onNotificationReceived = { payload in
-            let cat = NotificationCategory(rawValue: payload.category ?? "info") ?? .info
-            let ts = payload.timestamp.map { Date(timeIntervalSince1970: TimeInterval($0)) } ?? Date()
-            let extra = payload.extra?.reduce(into: [String: Any]()) { $0[$1.key] = $1.value.value } ?? [:]
-            let record = NotificationRecord(title: payload.title, body: payload.body, category: cat, timestamp: ts, extra: extra)
-            modelContext.insert(record)
-            NotificationManager.shared.showNotification(title: payload.title, body: payload.body, category: cat.rawValue)
-        }
-        server.start()
     }
 
     private func clearAll() {
@@ -211,6 +195,6 @@ struct SettingsView: View {
 }
 
 #Preview {
-    ContentView(server: WebhookServer())
+    ContentView(server: WebhookServer(), modelContainer: try! ModelContainer(for: NotificationRecord.self))
         .modelContainer(for: NotificationRecord.self, inMemory: true)
 }

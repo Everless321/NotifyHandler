@@ -4,6 +4,7 @@ import AppKit
 
 @main
 struct notifyhandlerApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @StateObject private var server = WebhookServer()
     @AppStorage("serverPort") private var serverPort: Int = 19527
 
@@ -17,9 +18,18 @@ struct notifyhandlerApp: App {
         }
     }()
 
+    init() {
+        NotificationManager.shared.requestPermission()
+    }
+
     var body: some Scene {
         Window("NotifyHandler", id: "main") {
-            ContentView(server: server)
+            ContentView(server: server, modelContainer: sharedModelContainer)
+                .onAppear {
+                    if !server.isRunning && server.onNotificationReceived == nil {
+                        setupServer()
+                    }
+                }
         }
         .modelContainer(sharedModelContainer)
 
@@ -30,6 +40,26 @@ struct notifyhandlerApp: App {
             Image(systemName: server.isRunning ? "bell.fill" : "bell.slash")
         }
     }
+
+    private func setupServer() {
+        server.port = UInt16(serverPort)
+        server.onNotificationReceived = { [self] payload in
+            let cat = NotificationCategory(rawValue: payload.category ?? "info") ?? .info
+            let ts = payload.timestamp.map { Date(timeIntervalSince1970: TimeInterval($0)) } ?? Date()
+            let extra = payload.extra?.reduce(into: [String: Any]()) { $0[$1.key] = $1.value.value } ?? [:]
+            let record = NotificationRecord(title: payload.title, body: payload.body, category: cat, timestamp: ts, extra: extra)
+            let context = sharedModelContainer.mainContext
+            context.insert(record)
+            try? context.save()
+            NotificationManager.shared.showNotification(title: payload.title, body: payload.body, category: cat.rawValue)
+        }
+        server.start()
+    }
+}
+
+class AppDelegate: NSObject, NSApplicationDelegate {
+    func applicationDidFinishLaunching(_ notification: Notification) {}
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
 }
 
 struct MenuBarView: View {
